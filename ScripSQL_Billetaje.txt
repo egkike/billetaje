@@ -1,0 +1,111 @@
+//--------------------------------------------------------------------------------------------------------------------------------------------
+// By: Kike Garcia
+// Email: egkike@gmail.com
+//
+// Proyecto: OPAMA
+// Origen: 8 CDs con datos del sistema de billetaje electrónico de enero de 2022 a marzo de 2023.
+//                  (https://github.com/luchobenitez/monda-guasu)
+// Objetivo: Este Scrip tiene como objetivo ayudar y facilitar la tarea de IMPORTAR los datos contenidos en los Archivos CSV
+//            a Tablas de una DB MariaDB o MySQL.
+// Fecha: 14/04/2023
+//--------------------------------------------------------------------------------------------------------------------------------------------
+
+// SCRIP 1 para una DB MariaDB o MySQL:
+
+// Paso 1: Crear una Tabla Auxiliar de eventos de billetaje (eventos_bille) con columnas en formato STRING para IMPORTAR desde el archivo CSV:
+// (Este paso ejecutar Solo 1 vez)
+ CREATE TABLE IF NOT EXISTS eventos_bille (
+  serialtarjeta varchar(50) NULL,
+  idsam varchar(30) NULL,
+  fechahoraevento varchar(29) NULL,
+  producto varchar(2) NULL,
+  montoevento varchar(5) NULL,
+  consecutivoevento varchar(10) NULL,
+  identidad varchar(1) NULL,
+  tipoevento varchar(2) NULL,
+  longitude varchar(10) NULL,
+  latitude varchar(10) NULL,
+  idrutaestacion varchar(10) NULL,
+  tipotransporte varchar(1) NULL
+  );
+
+// Paso 2: IMPORTAR el archivo CSV a la tabla Auxiliar (eventos_bille) utilizando la herramienta de importacion de su DB Manager
+// (en mi caso DBeaver 23.0.2).
+// (Configurar el ";" como separador de columnas y especificar que no utilice el primer registro como Header.
+//  Luego en la importacion Saltar el primer registro porque contiene los nombres de columnas).
+// (Verificar que la Tabla Auxiliar (eventos_bille) se encuentre VACIA antes de Importar el archivo CSV)
+
+	// Para verificar los registros de la tabla (eventos_bille) una vez terminada la Importacion del archivo CSV:
+	SELECT * FROM eventos_bille;
+
+// Paso 3: Crear la Tabla Principal de eventos de billetaje (eventos_billetaje) que va contener TODOS los registros:
+// (Este paso ejecutar Solo 1 vez)
+CREATE TABLE IF NOT EXISTS eventos_billetaje (
+  serialtarjeta varchar(50) NULL,
+  idsam varchar(30) NULL,
+  fechahoraevento timestamp NULL,
+  producto varchar(2) NULL,
+  montoevento INT NULL,
+  consecutivoevento INT NULL,
+  identidad INT NULL,
+  tipoevento INT NULL,
+  longitude FLOAT NULL,
+  latitude FLOAT NULL,
+  idrutaestacion varchar(10) NULL,
+  tipotransporte INT NULL
+  );
+
+// Paso 4: Insertar los registros importados desde la tabla Auxiliar eventos_bille a la tabla Principal eventos_billetaje:
+INSERT INTO eventos_billetaje (serialtarjeta, idsam, fechahoraevento, producto, montoevento, consecutivoevento, identidad,
+			tipoevento, longitude, latitude, idrutaestacion, tipotransporte)
+	SELECT serialtarjeta,
+			idsam,
+			CAST(fechahoraevento AS DATETIME) AS fechahoraevento,
+			producto,
+			CAST(montoevento AS UNSIGNED INTEGER) AS montoevento,
+			CAST(consecutivoevento AS UNSIGNED INTEGER) AS consecutivoevento,
+			CAST(identidad AS UNSIGNED INTEGER) AS identidad,
+			CAST(tipoevento AS UNSIGNED INTEGER) AS tipoevento,
+			CAST(longitude AS FLOAT) AS longitude,
+			CAST(latitude AS FLOAT) AS latitude,
+			idrutaestacion,
+			CAST(tipotransporte AS UNSIGNED INTEGER) AS tipotransporte
+	FROM eventos_bille;
+
+	// Para verificar los registros de la tabla:
+	SELECT * FROM eventos_billetaje;
+
+
+// Paso 5: Truncar o eliminar todos los registros de la tabla auxiliar (eventos_bille) y dejarla lista para otra Importacion:
+TRUNCATE TABLE eventos_bille;
+
+// Para procesar Otro archivo CSV Repetir los Pasos 2, 4 y 5.
+// Llevar el Control de los archivos CSV que se van importando y procesando para no dulicar informacion.
+
+
+
+-----------------------------------------------------------------------------------------------------------------------------------------------------
+// SCRIP 2 para IMPORTAR el archivo "Catalogo de rutas - 2023 con troncales.xlsx" a una DB MariaDB o MySQL.
+
+// Paso 1: Abrir (con Exel o LibreOffice) el archivo "Catalogo de rutas - 2023 con troncales.xlsx".
+//			Eliminar la Primer Fila que contiene los nombres de columnas.
+//			Luego Guardar Como "Catalogo de rutas - 2023 con troncales.csv". Archivo del tipo CSV.
+
+
+// Paso 2: Crear la Tabla de Catalogo de Rutas (catalogo_rutas) que va contener los registros del archivo CSV:
+// 		(Este paso ejecutar Solo 1 vez)
+ CREATE TABLE IF NOT EXISTS catalogo_rutas (
+  eot varchar(40) NULL,
+  id_troncal varchar(20) NULL,
+  ruta_hex varchar(10) NULL,
+  ramal_integrante varchar(80) NULL,
+  estado varchar(10) NULL
+  );
+
+// Paso 3: IMPORTAR el archivo "Catalogo de rutas - 2023 con troncales.csv" a la tabla (catalogo_rutas) utilizando
+//		la opcion de importacion de su DB Manager (mi caso DBeaver 23.0.2).
+//		(Configurar la coma "," como separador de columnas y especificar que no utilice el primer registro como Header.
+//		(Verificar que la Tabla (catalogo_rutas) se encuentre VACIA antes de Importar el archivo CSV)
+
+// Para verficar los registros importados (hay 444 registros):
+SELECT * FROM catalogo_rutas;
