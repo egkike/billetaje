@@ -1,0 +1,412 @@
+//======================================================================================================================================
+// By: Kike Garcia
+//
+// Origen de Datos: 8 CDs con datos del sistema de billetaje electrónico de enero de 2022 a marzo de 2023.
+//                  (https://github.com/luchobenitez/monda-guasu)
+// Objetivo: Este Scrip tiene como objetivo ayudar en la tarea de IMPORTAR los datos de a 1 MES a la vez contenidos en los Archivos CSV
+//            a Tablas de una DB MariaDB o MySQL. Luego se puedran Ejecutar varias CONSULTAS SQL sobre las Tablas de Datos y con los
+//            Resultados de dichas Consultas facilitar algunos ANALISIS sobre los mismos.
+// SCRIPS para DB: MariaDB o MySQL.
+// Fecha: 19/04/2023
+//======================================================================================================================================
+
+
+//------------------------------------------------------------------------------------------------------------
+// PASO 00: IMPORTAR el archivo "Catalogo de rutas - 2023 con troncales.xlsx" a una DB MariaDB o MySQL.
+// 			(Este paso ejecutar Solo 1 vez)
+
+// A: Abrir (con Exel o LibreOffice) el archivo "Catalogo de rutas - 2023 con troncales.xlsx".
+//			Eliminar la Primer Fila que contiene los nombres de columnas.
+//			Luego Guardar Como "Catalogo de rutas - 2023 con troncales.csv". Archivo del tipo CSV.
+
+// B: Crear la Tabla de Catalogo de Rutas (catalogo_rutas) que va contener los registros del archivo CSV:
+// 		(Este paso ejecutar Solo 1 vez)
+ CREATE TABLE IF NOT EXISTS catalogo_rutas (
+  eot varchar(40) NULL,
+  id_troncal varchar(20) NULL,
+  ruta_hex varchar(10) NULL,
+  ramal_integrante varchar(80) NULL,
+  estado varchar(10) NULL
+  );
+
+// C: IMPORTAR el archivo "Catalogo de rutas - 2023 con troncales.csv" a la tabla (catalogo_rutas) utilizando
+//		la opcion de importacion de su DB Manager (mi caso DBeaver 23.0.2).
+//		Configurar la coma "," como separador de columnas y especificar que no utilice el primer registro
+//		como Header.
+//		Verificar que la Tabla (catalogo_rutas) se encuentre VACIA antes de Importar el archivo CSV.
+
+//------------------------------------------------------------------------------------------------------------
+
+
+// PASO 01: Crear una Tabla Auxiliar de eventos de billetaje (eventos_bille_imp) con columnas
+//			en formato STRING para IMPORTAR el archivo CSV:
+// 			(Este paso ejecutar Solo 1 vez)
+//	Recomiendo Cargar/Importar solo 1 MES de Informacion a la vez (1 solo archivo CSV por vez)
+//	e ir procesando los resultados de ese Mes para mas agilidad en la ejecucion de las Consultas.
+CREATE TABLE IF NOT EXISTS eventos_bille_imp (
+  serialtarjeta varchar(50) NULL,
+  idsam varchar(30) NULL,
+  fechahoraevento varchar(29) NULL,
+  producto varchar(2) NULL,
+  montoevento varchar(5) NULL,
+  consecutivoevento varchar(10) NULL,
+  identidad varchar(1) NULL,
+  tipoevento varchar(2) NULL,
+  longitude varchar(10) NULL,
+  latitude varchar(10) NULL,
+  idrutaestacion varchar(10) NULL,
+  tipotransporte varchar(1) NULL
+  );
+
+// PASO 02: Crear la Tabla de eventos de billetaje (eventos_billetaje_mes)
+//			que va contener los registros del MES Importado:
+// 			(Este paso ejecutar Solo 1 vez)
+//	Recomiendo Cargar/Importar solo 1 MES de Informacion a la vez
+//	e ir procesando los resultados de ese Mes para mas agilidad.
+CREATE TABLE IF NOT EXISTS eventos_billetaje_mes (
+  serialtarjeta varchar(50) NULL,
+  idsam varchar(30) NULL,
+  fechahoraevento timestamp NULL,
+  producto varchar(2) NULL,
+  montoevento INT NULL,
+  consecutivoevento INT NULL,
+  identidad INT NULL,
+  tipoevento INT NULL,
+  longitude FLOAT NULL,
+  latitude FLOAT NULL,
+  idrutaestacion varchar(10) NULL,
+  tipotransporte INT NULL
+  );
+
+ // PASO 03: Crear la Tabla de eventos de billetaje (eventos_billetaje_dia)
+//			que va contener los registros de 1 solo DIA:
+// 			(Este paso ejecutar Solo 1 vez)
+//	Recomiendo Cargar en la Tabla solo 1 DIA de Informacion a la vez
+//	e ir procesando los resultados de ese Dia para mas agilidad.
+CREATE TABLE IF NOT EXISTS eventos_billetaje_dia (
+  serialtarjeta varchar(50) NULL,
+  idsam varchar(30) NULL,
+  fechahoraevento timestamp NULL,
+  producto varchar(2) NULL,
+  montoevento INT NULL,
+  consecutivoevento INT NULL,
+  identidad INT NULL,
+  tipoevento INT NULL,
+  longitude FLOAT NULL,
+  latitude FLOAT NULL,
+  idrutaestacion varchar(10) NULL,
+  tipotransporte INT NULL
+  );
+
+//--------------------------------------------------------------------------------------------------
+// A partir del Paso 04 se REPITEN los pasos por cada siguiente MES a procesar:
+//--------------------------------------------------------------------------------------------------
+
+// PASO 04: IMPORTAR el archivo CSV (Ej.: 1- Enero_2022.csv) a la tabla Auxiliar (eventos_bille_imp)
+//			utilizando la herramienta de importacion de su DB Manager (en mi caso DBeaver 23.0.2)
+//			Configurar el ";" como separador de columnas y especificar que no utilice el primer
+//			registro como Header. Luego en la importacion Saltar el primer registro.
+//			(Me Tarda aprox. 15 Minutos)
+//	Asegurarse que la Tabla Auxiliar (eventos_bille_imp) se encuentre VACIA antes de Importar
+//	el archivo CSV (1 solo archivo CSV por vez):
+TRUNCATE TABLE eventos_bille_imp;
+
+// PASO 05: Insertar los registros importados desde la tabla Auxiliar eventos_bille_imp
+//			a la tabla (Vacia) eventos_billetaje_mes (Me Tarda aprox. 4 Minutos):
+// ELIMINAR este Indice (si existe) Antes de vaciar y volver a insertar registros en la tabla:
+ALTER TABLE eventos_billetaje_mes DROP INDEX eventos_billetaje_fechahoraevento_IDX;
+
+TRUNCATE TABLE eventos_bille_mes;
+
+INSERT INTO eventos_billetaje_mes (
+			serialtarjeta,
+			idsam,
+			fechahoraevento,
+			producto,
+			montoevento,
+			consecutivoevento,
+			identidad,
+			tipoevento,
+			longitude,
+			latitude,
+			idrutaestacion,
+			tipotransporte
+			)
+	SELECT serialtarjeta,
+			idsam,
+			CAST(fechahoraevento AS DATETIME) AS fechahoraevento,
+			producto,
+			CAST(montoevento AS UNSIGNED INTEGER) AS montoevento,
+			CAST(consecutivoevento AS UNSIGNED INTEGER) AS consecutivoevento,
+			CAST(identidad AS UNSIGNED INTEGER) AS identidad,
+			CAST(tipoevento AS UNSIGNED INTEGER) AS tipoevento,
+			CAST(longitude AS FLOAT) AS longitude,
+			CAST(latitude AS FLOAT) AS latitude,
+			idrutaestacion,
+			CAST(tipotransporte AS UNSIGNED INTEGER) AS tipotransporte
+	FROM eventos_bille_imp
+
+// CREAR un Indice Por Fecha, serialtarjeta, producto y tipoevento
+//			para tener un mejor PERFORMANCE al Ejecutar las Consultas.
+//			(Me Tarda aprox. 5 Minutos)
+CREATE INDEX eventos_billetaje_fechahoraevento_IDX
+USING BTREE ON eventos_billetaje_mes (fechahoraevento,serialtarjeta,producto,tipoevento,idrutaestacion)
+;
+
+
+// PASO 06: Ejecutar las CONSULTAS correspondientes a la Tabla eventos_billetaje_mes:
+//			(Estas CONSULTAS se ejecutan sobre los registros de 1 MES)
+
+// SCRIP 01: Consulta resumen Por Mes la Fecha Minima, Fecha Maxima
+//			 y Cantidad de Eventos en la Tabla eventos_billetaje:
+//			(Me Tarda aprox. 40 Segundos)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m') AS ANNO_MES,
+		MIN(fechahoraevento) AS FECHA_MINIMA,
+		MAX(fechahoraevento) AS FECHA_MAXIMA,
+		COUNT(*) AS CANT_EVENTOS
+FROM eventos_billetaje_mes
+GROUP BY DATE_FORMAT(fechahoraevento, '%Y%/%m')
+;
+
+// SCRIP 02: Consulta resumen Por Mes, Por Producto, Por Tipo Evento
+//			 con la Cantidad y Sumatoria de Eventos en la Tabla eventos_billetaje:
+//			(Me Tarda aprox. 42 Segundos)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m') AS ANNO_MES,
+		producto AS PRODUCTO,
+		tipoevento AS TIPO_EVENTO,
+		COUNT(*) AS CANT_EVENTOS,
+		SUM(montoevento) AS MONTO_EVENTOS
+FROM eventos_billetaje_mes
+GROUP BY DATE_FORMAT(fechahoraevento, '%Y%/%m'),
+		producto,
+		tipoevento
+;
+
+// SCRIP 03: Consulta resumen Por Fecha, Por Dia de la semana, Por Producto, Por Tipo Evento
+//			 con la Cantidad y Sumatoria de Eventos en la Tabla eventos_billetaje:
+//			(Me Tarda aprox. 44 Segundos)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d') AS FECHA_EVENTO,
+		DAYNAME(fechahoraevento) AS DIA_SEMANA,
+		producto AS PRODUCTO,
+		tipoevento AS TIPO_EVENTO,
+		COUNT(*) AS CANT_EVENTOS,
+		SUM(montoevento) AS MONTO_EVENTOS
+FROM eventos_billetaje_mes
+GROUP BY DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d'),
+			DAYNAME(fechahoraevento),
+			producto,
+			tipoevento
+;
+
+// SCRIP 04: Consulta resumen Por Fecha, Por Hora, Por Dia de la semana, Por Producto, Por Tipo Evento
+//			 con la Cantidad y Sumatoria de Eventos en la Tabla eventos_billetaje:
+//			(Me Tarda aprox. 46 Segundos)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d') AS FECHA_EVENTO,
+		HOUR(fechahoraevento) AS HORA_EVENTO,
+		DAYNAME(fechahoraevento) AS DIA_SEMANA,
+		producto AS PRODUCTO,
+		tipoevento AS TIPO_EVENTO,
+		COUNT(*) AS CANT_EVENTOS,
+		SUM(montoevento) AS MONTO_EVENTOS
+FROM eventos_billetaje_mes
+GROUP BY DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d'),
+			HOUR(fechahoraevento),
+			DAYNAME(fechahoraevento),
+			producto,
+			tipoevento
+;
+
+// SCRIP 05: Consulta resumen Por Fecha, Por Producto, Por Tipo Evento, Por Serial Tarjeta
+//			 con la Cantidad de Eventos Mayor a 10:
+//			(Me Tarda aprox. 6 Minutos)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d') AS FECHA_EVENTO,
+		serialtarjeta AS ID_TARJETA,
+		producto AS PRODUCTO,
+		tipoevento AS TIPO_EVENTO,
+		COUNT(*) AS CANT_EVENTOS,
+		SUM(montoevento) AS MONTO_EVENTOS
+FROM eventos_billetaje_mes
+GROUP BY DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d'),
+		serialtarjeta,
+		producto,
+		tipoevento
+HAVING COUNT(*) > 10
+;
+
+// SCRIP 06: Consulta resumen Por Fecha, Por Hora, Por Dia de la semana, Por Producto, Por Tipo Evento
+//			 Por Id Ruta y Por Empresa con la Cantidad y Sumatoria de Eventos en la Tabla eventos_billetaje:
+//			(Me Tarda aprox. 10 Minutos)
+SELECT DATE_FORMAT(a.fechahoraevento, '%Y%/%m%/%d') AS FECHA_EVENTO,
+		HOUR(a.fechahoraevento) AS HORA_EVENTO,
+		DAYNAME(a.fechahoraevento) AS DIA_SEMANA,
+		a.producto AS PRODUCTO,
+		a.tipoevento AS TIPO_EVENTO,
+		a.idrutaestacion AS ID_RUTA,
+		b.eot AS EMPRESA,
+		COUNT(*) AS CANT_EVENTOS,
+		SUM(montoevento) AS MONTO_EVENTOS
+FROM eventos_billetaje_mes a
+	LEFT JOIN catalogo_rutas b
+	ON a.idrutaestacion = b.ruta_hex
+GROUP BY DATE_FORMAT(a.fechahoraevento, '%Y%/%m%/%d'),
+			HOUR(a.fechahoraevento),
+			DAYNAME(a.fechahoraevento),
+			a.producto,
+			a.tipoevento,
+			a.idrutaestacion,
+			b.eot
+;
+
+//--------------------------------------------------------------------------------------------------
+// A partir del Paso 07 se REPITE por cada siguiente DIA a procesar:
+// 	(Cambiar el DIA en el WHERE del INSERT por cada Dia del MES)
+//--------------------------------------------------------------------------------------------------
+
+// PASO 07: Insertar los registros importados desde la tabla Auxiliar eventos_bille_imp
+//			a la tabla (Vacia) eventos_billetaje_dia:
+//			(Me Tarda aprox. 50 Segundos)
+// ELIMINAR este Indice (si existe) Antes de vaciar y volver a insertar registros en la tabla:
+ALTER TABLE eventos_billetaje_dia DROP INDEX eventos_billetaje_fechahoraevento_IDX;
+
+TRUNCATE TABLE eventos_bille_dia;
+
+INSERT INTO eventos_billetaje_dia (
+			serialtarjeta,
+			idsam,
+			fechahoraevento,
+			producto,
+			montoevento,
+			consecutivoevento,
+			identidad,
+			tipoevento,
+			longitude,
+			latitude,
+			idrutaestacion,
+			tipotransporte
+			)
+	SELECT serialtarjeta,
+			idsam,
+			CAST(fechahoraevento AS DATETIME) AS fechahoraevento,
+			producto,
+			CAST(montoevento AS UNSIGNED INTEGER) AS montoevento,
+			CAST(consecutivoevento AS UNSIGNED INTEGER) AS consecutivoevento,
+			CAST(identidad AS UNSIGNED INTEGER) AS identidad,
+			CAST(tipoevento AS UNSIGNED INTEGER) AS tipoevento,
+			CAST(longitude AS FLOAT) AS longitude,
+			CAST(latitude AS FLOAT) AS latitude,
+			idrutaestacion,
+			CAST(tipotransporte AS UNSIGNED INTEGER) AS tipotransporte
+	FROM eventos_bille_imp
+	WHERE DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d') = '2022/01/03'
+;
+
+// CREAR un Indice Por Fecha, serialtarjeta, producto y tipoevento
+//			para tener un mejor PERFORMANCE al Ejecutar las Consultas.
+CREATE INDEX eventos_billetaje_fechahoraevento_IDX
+USING BTREE ON eventos_billetaje_dia (fechahoraevento,serialtarjeta,producto,tipoevento,idrutaestacion)
+;
+
+
+// PASO 08: Ejecutar las CONSULTAS correspondientes a la Tabla eventos_billetaje_dia:
+//			Recomiendo ejecutar estas Consultas Solo con los registros correspondientes a 1 DIA.
+
+// SCRIP 01: Consulta resumen Por Fecha y Por Serial Tarjeta
+//			 con 20 o mas transacciones por Dia y de esas 20
+//			 con 10 o mas Eventos realizados en lapsos de 0 a 59 Segundos:
+//			 (Se pueden cambiar estos valores en los WHERE correspondientes)
+SELECT DATE_FORMAT(fechahoraevento, '%Y%/%m%/%d') AS FECHA_EVENTO,
+		serialtarjeta AS SERIAL_TARJETA,
+		'VARIOS EVENTOS EN LAPSOS DE 0 A 59 SEGUNDOS' AS MOTIVO,
+		COUNT(*) AS CANT_EVENTOS
+FROM(
+  	SELECT fechahoraevento,
+  			serialtarjeta
+	FROM(
+	SELECT fechahoraevento,
+	LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento) AS FECHA_HORA_ANTERIOR,
+	EXTRACT(DAY FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) AS DIA,
+	EXTRACT(HOUR FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) AS HORA,
+	EXTRACT(MINUTE FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) AS MINUTO,
+	EXTRACT(SECOND FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) AS SEGUNDO,
+	serialtarjeta
+	FROM(
+		SELECT
+			fechahoraevento,
+			serialtarjeta,
+			COUNT(1) over(partition by serialtarjeta) AS CANT_TRX
+		FROM eventos_billetaje_dia
+		) b
+		WHERE b.CANT_TRX >= 20
+		ORDER BY b.fechahoraevento
+	) a
+  	WHERE a.DIA = 0
+  			AND a.HORA = 0
+  			AND a.MINUTO = 0
+  			AND a.SEGUNDO > 0
+  ) c
+GROUP BY DATE_FORMAT(c.fechahoraevento, '%Y%/%m%/%d'),
+			c.serialtarjeta
+HAVING COUNT(*) >= 10
+;
+
+// SCRIP 02: Consulta para Verificar los Eventos de una serialtarjeta especifica:
+//	(COPIAR 1 serialtarjeta del Resultado de la consulta anterior y PEGAR en el WHERE)
+//		OBS.: Hay algunas ruta_hex que NO Existen en la tabla catalogo_rutas
+//				como por ej. ruta_hex = '0111'
+// Con esta CONSULTA se Muestran tambien las ruta_hex que NO Existen en catalogo_rutas:
+SELECT a.fechahoraevento,
+  		a.serialtarjeta,
+  		a.idsam,
+  		a.producto,
+  		a.tipoevento,
+  		a.montoevento,
+  		a.identidad,
+		a.longitude,
+		a.latitude,
+  		a.idrutaestacion,
+  		b.eot AS EMPRESA
+FROM eventos_billetaje_dia a
+	LEFT JOIN catalogo_rutas b
+	ON a.idrutaestacion = b.ruta_hex
+WHERE a.serialtarjeta = '0e6a295c5ba0c0a3be47e8a367bde890'
+ORDER BY a.fechahoraevento
+;
+
+//--------------------------------------------------------------------------------------------------
+// VOLVER al PASO 07 para Procesar el siguiente DIA o
+// VOLVER al PASO 04 para Procesar el siguiente MES.
+//--------------------------------------------------------------------------------------------------
+
+
+
+// SCRIP EXTRA: Consulta Detalle Por Serial Tarjeta y Fecha
+//			 	con 20 o mas transacciones por Dia y de esas 20
+//			 	con Eventos realizados en lapsos de 0 a 59 Segundos:
+SELECT
+  		serialtarjeta,
+		fechahoraevento,
+  		FECHA_HORA_ANTERIOR,
+  		DIA,
+  		HORA,
+  		MINUTO,
+  		SEGUNDO
+FROM(
+	SELECT fechahoraevento,
+		LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento) as FECHA_HORA_ANTERIOR,
+		EXTRACT(DAY FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) as DIA,
+		EXTRACT(HOUR FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) as HORA,
+		EXTRACT(MINUTE FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) as MINUTO,
+		EXTRACT(SECOND FROM (fechahoraevento - LAG(fechahoraevento,1) over(partition by serialtarjeta order by fechahoraevento))) as SEGUNDO,
+		serialtarjeta
+		FROM(
+			SELECT
+				fechahoraevento,
+				serialtarjeta, COUNT(1) over(partition by serialtarjeta) as CANT_TRX
+			FROM eventos_billetaje_dia
+		) b
+		WHERE b.CANT_TRX >= 20
+		ORDER BY b.fechahoraevento
+) a
+WHERE a.DIA = 0 AND a.HORA = 0 AND a.MINUTO = 0 AND a.SEGUNDO > 0
+ORDER BY a.serialtarjeta, a.fechahoraevento
+;
